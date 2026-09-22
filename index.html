@@ -492,7 +492,7 @@ async function evaluateQuestionAI(q,expectedType=""){
 목표는 학생 대신 질문을 만들어 주는 것이 아니라 학생이 스스로 더 좋은 질문으로 고쳐 쓰게 돕는 것이다.
 평가 기준: ① 실제 질문 유형 ② 이 칸의 목표 유형과 일치하는가 ③ 면담 목적과 관련되는가 ④ 대상자에게 적절한가 ⑤ 무엇을 알고 싶은지 분명한가 ⑥ 답하기 쉬운가 ⑦ 예의와 개인정보를 지키는가 ⑧ 구체적인 답을 이끌 수 있는가.
 유형 기준: 사실은 실제 정보·역할·방법·과정·준비를 묻는 질문, 생각이나 느낌은 생각·의견·감정·느낌을 묻는 질문, 앞으로의 계획이나 당부는 앞으로의 계획·목표·꿈·하고 싶은 일·조언을 묻는 질문이다. "어떤/어떻게"라는 표현만으로 유형을 판단하지 않는다.
-이 칸의 목표 유형: \${expectedType}
+이 칸의 목표 유형: ${expectedType}
 피드백은 초등학교 6학년이 이해하기 쉬운 말로 한다.
 좋은 질문이라면 억지로 고치지 말고 무엇이 좋은지 설명한다.
 고칠 필요가 있다면 한꺼번에 많이 지적하지 말고 가장 중요한 1~2가지만 알려 준다.
@@ -551,7 +551,7 @@ function makeQuestions(){
  <div class="actions"><button class="btn btn-primary" id="checkQuestions">AI 교사에게 세 질문 점검받기</button></div>
  ${checks?`<div class="section grid grid-3">${checks.map((r,i)=>`
    <div class="question-card">
-    <span class="badge ${r.kind==="good"?"badge-green":r.kind==="sensitive"||r.kind==="off"?"badge-amber":"badge-blue"}">${r.kind==="good"?"좋은 질문":r.kind==="sensitive"?"배려가 필요해요":r.kind==="off"?"목적을 다시 생각해요":"조금 다듬어 봐요"}</span>
+    <span class="badge ${r.typeMismatch?"badge-amber":r.kind==="good"?"badge-green":r.kind==="sensitive"||r.kind==="off"?"badge-amber":"badge-blue"}">${r.typeMismatch?"질문 유형을 다시 생각해요":r.kind==="good"?"좋은 질문":r.kind==="sensitive"?"배려가 필요해요":r.kind==="off"?"목적을 다시 생각해요":"조금 다듬어 봐요"}</span>
     <strong style="display:block;margin-top:10px">${i+1}. ${esc(r.q||"(빈 질문)")}</strong>
     ${r.type?`<div class="small muted" style="margin-top:7px">질문 유형: ${esc(r.type)}</div>`:""}
     <div class="feedback ${r.kind==="good"?"good":r.kind==="sensitive"||r.kind==="off"?"bad":"hint"}">${esc(r.text||"")}</div>
