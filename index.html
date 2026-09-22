@@ -481,7 +481,7 @@ function parseTeacherJSON(raw){
 async function evaluateQuestionAI(q){
  const fallback=evaluateQuestion(q);
  if(fallback.kind==="empty" || !q.trim()) return fallback;
- const systemPrompt=\`너는 초등학교 6학년 국어 수업의 AI 교사다.
+ const systemPrompt=`너는 초등학교 6학년 국어 수업의 AI 교사다.
 학생이 지금 작성한 면담 질문을 실제로 읽고, 학생의 현재 면담 목적·대상자·앞서 만든 질문까지 고려해서 코칭한다.
 절대로 고정된 칭찬 문장을 반복하지 않는다. 질문의 실제 낱말과 의도를 반드시 언급한다.
 목표는 학생 대신 질문을 만들어 주는 것이 아니라 학생이 스스로 더 좋은 질문으로 고쳐 쓰게 돕는 것이다.
@@ -492,9 +492,9 @@ async function evaluateQuestionAI(q){
 JSON 하나만 출력한다. 마크다운이나 코드블록은 사용하지 않는다.
 형식: {"kind":"good|revise|sensitive|off","type":"사실|생각이나 느낌|앞으로의 계획이나 당부|복합","text":"2~4문장의 구체적인 교사 피드백","strengths":["구체적으로 잘한 점"],"issues":["구체적으로 고칠 점"],"suggestion":"학생이 스스로 고쳐 볼 수 있는 힌트 또는 개선 질문 예시. 필요 없으면 빈 문자열"}
 현재 학습 맥락:
-\${compactContext()}
+${compactContext()}
 현재 평가할 질문:
-\${q}\`;
+${q}`;
  try{
    const raw=await callTeacherAI({message:q,history:[],systemPrompt});
    const parsed=parseTeacherJSON(raw);
@@ -514,16 +514,16 @@ JSON 하나만 출력한다. 마크다운이나 코드블록은 사용하지 않
 async function coachWriting(kind,content){
  const c=studentContext();
  const labels={summary:"면담 내용 정리",report:"면담 보고서",reflect:"면담 성찰"};
- const systemPrompt=\`너는 초등학교 6학년 국어 수업의 AI 교사다.
-학생의 \${labels[kind]||kind}를 읽고, 학생 대신 완성해 주지 말고 스스로 개선할 수 있도록 코칭한다.
+ const systemPrompt=`너는 초등학교 6학년 국어 수업의 AI 교사다.
+학생의 ${labels[kind]||kind}를 읽고, 학생 대신 완성해 주지 말고 스스로 개선할 수 있도록 코칭한다.
 학생의 면담 목적과 대상자, 앞서 만든 질문 등 학습 맥락을 고려한다.
 잘한 점은 구체적으로 짚고, 가장 중요한 개선점은 1~2개만 알려 주며, 다음에 무엇을 해 보면 좋을지 제안한다.
 학생이 쓴 내용을 실제로 언급하고 고정된 칭찬을 반복하지 않는다.
 JSON 하나만 출력한다. {"text":"학생에게 보여 줄 3~5문장","strengths":["구체적인 강점"],"issues":["가장 중요한 개선점"],"next":"다음에 해 볼 한 가지"}.
 학습 맥락:
-\${JSON.stringify(c)}
+${JSON.stringify(c)}
 학생의 현재 작성 내용:
-\${content}\`;
+${content}`;
  const raw=await callTeacherAI({message:content,history:[],systemPrompt});
  const p=parseTeacherJSON(raw);
  return {text:String(p.text||""),strengths:Array.isArray(p.strengths)?p.strengths:[],issues:Array.isArray(p.issues)?p.issues:[],next:String(p.next||"")};
@@ -531,26 +531,26 @@ JSON 하나만 출력한다. {"text":"학생에게 보여 줄 3~5문장","streng
 
 function makeQuestions(){
  const checks=state.questionChecks;
- return \`<div class="section card">
+ return `<div class="section card">
  <div class="callout"><b>AI 교사와 함께 질문을 다듬어 봐요.</b><br>정답을 대신 만들어 주는 것이 아니라, 내가 만든 질문에서 좋은 점과 고칠 점을 찾아 다시 생각하도록 도와줘요.</div>
  <div class="grid grid-3" style="margin-top:16px">
- \${["구체적인 사실에 대한 질문","생각이나 느낌에 대한 질문","앞으로의 계획이나 당부에 대한 질문"].map((lab,i)=>\`<div><label>\${lab}</label><textarea class="q-input" data-qidx="\${i}" placeholder="내가 궁금한 것을 직접 질문으로 만들어 보세요.">\${esc(state.questions[i])}</textarea></div>\`).join("")}
+ ${["구체적인 사실에 대한 질문","생각이나 느낌에 대한 질문","앞으로의 계획이나 당부에 대한 질문"].map((lab,i)=>`<div><label>${lab}</label><textarea class="q-input" data-qidx="${i}" placeholder="내가 궁금한 것을 직접 질문으로 만들어 보세요.">${esc(state.questions[i])}</textarea></div>`).join("")}
  </div>
  <div class="actions"><button class="btn btn-primary" id="checkQuestions">AI 교사에게 세 질문 점검받기</button></div>
- \${checks?\`<div class="section grid grid-3">\${checks.map((r,i)=>\`
+ ${checks?`<div class="section grid grid-3">${checks.map((r,i)=>`
    <div class="question-card">
-    <span class="badge \${r.kind==="good"?"badge-green":r.kind==="sensitive"||r.kind==="off"?"badge-amber":"badge-blue"}">\${r.kind==="good"?"좋은 질문":r.kind==="sensitive"?"배려가 필요해요":r.kind==="off"?"목적을 다시 생각해요":"조금 다듬어 봐요"}</span>
-    <strong style="display:block;margin-top:10px">\${i+1}. \${esc(r.q||"(빈 질문)")}</strong>
-    \${r.type?\`<div class="small muted" style="margin-top:7px">질문 유형: \${esc(r.type)}</div>\`:""}
-    <div class="feedback \${r.kind==="good"?"good":r.kind==="sensitive"||r.kind==="off"?"bad":"hint"}">\${esc(r.text||"")}</div>
-    \${r.strengths?.length?\`<div class="small" style="margin-top:10px"><b>🟢 잘한 점</b><ul>\${r.strengths.map(x=>\`<li>\${esc(x)}</li>\`).join("")}</ul></div>\`:""}
-    \${r.issues?.length?\`<div class="small" style="margin-top:10px"><b>🟡 생각해 볼 점</b><ul>\${r.issues.map(x=>\`<li>\${esc(x)}</li>\`).join("")}</ul></div>\`:""}
-    \${r.suggestion?\`<div class="callout small" style="margin-top:10px"><b>💡 다시 생각해 볼 힌트</b><br>\${esc(r.suggestion)}</div>\`:""}
-   </div>\`).join("")}</div>\`:""}
+    <span class="badge ${r.kind==="good"?"badge-green":r.kind==="sensitive"||r.kind==="off"?"badge-amber":"badge-blue"}">${r.kind==="good"?"좋은 질문":r.kind==="sensitive"?"배려가 필요해요":r.kind==="off"?"목적을 다시 생각해요":"조금 다듬어 봐요"}</span>
+    <strong style="display:block;margin-top:10px">${i+1}. ${esc(r.q||"(빈 질문)")}</strong>
+    ${r.type?`<div class="small muted" style="margin-top:7px">질문 유형: ${esc(r.type)}</div>`:""}
+    <div class="feedback ${r.kind==="good"?"good":r.kind==="sensitive"||r.kind==="off"?"bad":"hint"}">${esc(r.text||"")}</div>
+    ${r.strengths?.length?`<div class="small" style="margin-top:10px"><b>🟢 잘한 점</b><ul>${r.strengths.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${r.issues?.length?`<div class="small" style="margin-top:10px"><b>🟡 생각해 볼 점</b><ul>${r.issues.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${r.suggestion?`<div class="callout small" style="margin-top:10px"><b>💡 다시 생각해 볼 힌트</b><br>${esc(r.suggestion)}</div>`:""}
+   </div>`).join("")}</div>`:""}
  </div>
  <div class="section card"><h2>질문을 발전시키는 탐험 규칙</h2><p>질문의 문장이 교과서 예시와 똑같아야 하는 것은 아니에요. <b>주제 + 의도 + 대상 + 면담 목적과의 관계</b>를 생각하며 스스로 질문을 발전시켜 봐요.</p>
  <div class="grid grid-2"><div class="callout"><b>힌트</b><br>누가, 언제, 무엇을, 어떻게, 왜와 같은 낱말을 활용하면 질문을 구체화하는 데 도움이 될 수 있어요.</div><div class="callout"><b>상대 배려</b><br>대답하기 난감하거나 개인적으로 공개하기 어려운 내용은 없는지 살펴봐요.</div></div></div>
- \${navButtons(state.stage-1,state.stage+1)}\`;
+ ${navButtons(state.stage-1,state.stage+1)}`;
 }
 function bindMake(){
  document.querySelectorAll(".q-input").forEach(el=>el.addEventListener("input",e=>{state.questions[Number(e.target.dataset.qidx)]=e.target.value;save()}));
