@@ -422,23 +422,27 @@ function bindSort(){
  });
 }
 
-function evaluateQuestion(q){
+const QUESTION_TYPE_LABELS=["구체적인 사실에 대한 질문","생각이나 느낌에 대한 질문","앞으로의 계획이나 당부에 대한 질문"];
+function normalizeQuestionType(type){const s=String(type||"").trim();if(s.includes("사실"))return QUESTION_TYPE_LABELS[0];if(s.includes("생각")||s.includes("느낌"))return QUESTION_TYPE_LABELS[1];if(s.includes("앞으로")||s.includes("계획")||s.includes("당부"))return QUESTION_TYPE_LABELS[2];return "";}
+
+function evaluateQuestion(q,expectedType=""){
  const s=q.trim();
- if(!s)return {kind:"empty",text:"질문을 입력해 보세요."};
+ if(!s)return {kind:"empty",text:"질문을 입력해 보세요.",expectedType};
  const lower=s.toLowerCase();
  const purpose=state.prepare.purpose || "선택한 면담 목적";
  const target=state.prepare.target || "면담 대상자";
  const personal=["주민등록","비밀번호","전화번호","주소","계좌","집 어디"];
  if(personal.some(k=>lower.includes(k))) return {kind:"sensitive",text:"개인정보를 묻는 질문은 피하는 것이 좋아요. 면담 목적과 꼭 필요한 관련이 있는지 먼저 생각해 보세요."};
+ const future=/앞으로|계획|목표|꿈|하고 싶|해 주고 싶은|당부|되고 싶/.test(lower);
+ const feel=/생각|느끼|보람|힘들|마음|중요하|까닭|이유|어떤 점이 좋|어떤 점이 힘/.test(lower);
  const fact=/어떤|무엇|무슨|몇|언제|어디|어떻게|과정|하는 일|업무|방법|준비/.test(lower);
- const feel=/생각|느끼|보람|힘들|마음|중요하|까닭|이유/.test(lower);
- const future=/앞으로|계획|목표|꿈|하고 싶|해 주고 싶은|당부/.test(lower);
- let type=fact?"구체적인 사실에 대한 질문":feel?"생각이나 느낌에 대한 질문":future?"앞으로의 계획이나 당부에 대한 질문":"질문의 유형을 더 생각해 볼 수 있어요.";
+ let type=future?QUESTION_TYPE_LABELS[2]:feel?QUESTION_TYPE_LABELS[1]:fact?QUESTION_TYPE_LABELS[0]:"";
  const polite=/(요|나요|까요|주세요|주실|하나요|하셨나요|있나요|인가요|습니까|세요)/.test(s);
  const clear=s.length<=100 && /[?？]/.test(s);
- if(!polite) return {kind:"revise",text:"내용은 보이지만, 면담 대상자가 편안하게 답할 수 있도록 공손한 표현으로 다듬어 보세요."};
- if(!clear) return {kind:"revise",text:"무엇을 알고 싶은지 조금 더 분명하게 드러내 보세요."};
- return {kind:"good",text:"질문의 형식은 잘 갖추었어요. 이제 답변을 들은 뒤 더 궁금한 점을 후속 질문으로 이어 가 보세요."};
+ if(!polite) return {kind:"revise",text:"내용은 보이지만, 면담 대상자가 편안하게 답할 수 있도록 공손한 표현으로 다듬어 보세요.",type,expectedType};
+ if(!clear) return {kind:"revise",text:"무엇을 알고 싶은지 조금 더 분명하게 드러내 보세요.",type,expectedType};
+ if(expectedType && type && type!==expectedType) return {kind:"revise",type,expectedType,typeMismatch:true,text:"질문의 내용은 이해되지만, 지금 칸에서 요구하는 질문 유형과 달라요. 먼저 질문의 종류를 맞춰 보는 것이 좋아요.",strengths:["질문에서 알고 싶은 내용은 비교적 분명하게 드러나요."],issues:["지금 칸은 \""+expectedType+"\"이어야 하는데, 이 질문은 \""+type+"\"에 더 가까워요."],suggestion:"질문의 주제는 유지하면서 \""+expectedType+"\"이 되도록 질문의 초점을 바꾸어 보세요."};
+ return {kind:"good",type,expectedType,typeMismatch:false,text:"질문의 형식은 잘 갖추었어요. 이제 답변을 들은 뒤 더 궁금한 점을 후속 질문으로 이어 가 보세요."};
 }
 
 function studentContext(){
@@ -478,14 +482,17 @@ function parseTeacherJSON(raw){
  return parsed;
 }
 
-async function evaluateQuestionAI(q){
- const fallback=evaluateQuestion(q);
+async function evaluateQuestionAI(q,expectedType=""){
+ const fallback=evaluateQuestion(q,expectedType);
  if(fallback.kind==="empty" || !q.trim()) return fallback;
  const systemPrompt=`너는 초등학교 6학년 국어 수업의 AI 교사다.
 학생이 지금 작성한 면담 질문을 실제로 읽고, 학생의 현재 면담 목적·대상자·앞서 만든 질문까지 고려해서 코칭한다.
+학생 질문의 실제 유형을 먼저 판단하고, 이 칸에서 요구하는 유형과 일치하는지 반드시 확인한다. 유형이 다르면 좋은 질문이라고 하지 말고 질문 유형이 틀렸다는 점을 가장 먼저 지적한다.
 절대로 고정된 칭찬 문장을 반복하지 않는다. 질문의 실제 낱말과 의도를 반드시 언급한다.
 목표는 학생 대신 질문을 만들어 주는 것이 아니라 학생이 스스로 더 좋은 질문으로 고쳐 쓰게 돕는 것이다.
-평가 기준: ① 면담 목적과 관련되는가 ② 대상자에게 적절한가 ③ 무엇을 알고 싶은지 분명한가 ④ 답하기 쉬운가 ⑤ 예의와 개인정보를 지키는가 ⑥ 구체적인 답을 이끌 수 있는가 ⑦ 사실/생각이나 느낌/앞으로의 계획이나 당부 유형이 적절한가.
+평가 기준: ① 실제 질문 유형 ② 이 칸의 목표 유형과 일치하는가 ③ 면담 목적과 관련되는가 ④ 대상자에게 적절한가 ⑤ 무엇을 알고 싶은지 분명한가 ⑥ 답하기 쉬운가 ⑦ 예의와 개인정보를 지키는가 ⑧ 구체적인 답을 이끌 수 있는가.
+유형 기준: 사실은 실제 정보·역할·방법·과정·준비를 묻는 질문, 생각이나 느낌은 생각·의견·감정·느낌을 묻는 질문, 앞으로의 계획이나 당부는 앞으로의 계획·목표·꿈·하고 싶은 일·조언을 묻는 질문이다. "어떤/어떻게"라는 표현만으로 유형을 판단하지 않는다.
+이 칸의 목표 유형: \${expectedType}
 피드백은 초등학교 6학년이 이해하기 쉬운 말로 한다.
 좋은 질문이라면 억지로 고치지 말고 무엇이 좋은지 설명한다.
 고칠 필요가 있다면 한꺼번에 많이 지적하지 말고 가장 중요한 1~2가지만 알려 준다.
@@ -498,10 +505,15 @@ ${q}`;
  try{
    const raw=await callTeacherAI({message:q,history:[],systemPrompt});
    const parsed=parseTeacherJSON(raw);
+   const actualType=normalizeQuestionType(parsed.type);
+   const typeMismatch=!!(expectedType && actualType && actualType!==expectedType);
+   if(typeMismatch) return {kind:"revise",type:actualType,expectedType,typeMismatch:true,text:"먼저 질문 유형을 확인해 볼게요. 이 질문은 \""+actualType+"\"에 더 가깝지만, 지금 칸에서는 \""+expectedType+"\"을 만들어야 해요. 질문 내용이 나쁘다기보다 질문의 종류를 바꾸는 것이 먼저 필요해요.",strengths:Array.isArray(parsed.strengths)?parsed.strengths:[],issues:["지금 질문은 \""+actualType+"\"에 가깝고, 이 칸의 목표는 \""+expectedType+"\"이에요."],suggestion:String(parsed.suggestion||("질문의 주제는 유지하면서 \""+expectedType+"\"이 되도록 질문의 초점을 바꾸어 보세요."))};
    return {
      kind:["good","revise","sensitive","off"].includes(parsed.kind)?parsed.kind:"revise",
      text:String(parsed.text||"질문의 내용을 살펴봤어요. 한 번 더 구체적으로 생각해 볼까요?"),
-     type:String(parsed.type||""),
+     type:actualType,
+     expectedType,
+     typeMismatch:false,
      strengths:Array.isArray(parsed.strengths)?parsed.strengths:[],
      issues:Array.isArray(parsed.issues)?parsed.issues:[],
      suggestion:String(parsed.suggestion||"")
@@ -557,9 +569,9 @@ function bindMake(){
  document.getElementById("checkQuestions")?.addEventListener("click",async()=>{
    const btn=document.getElementById("checkQuestions");
    if(btn){btn.disabled=true;btn.textContent="AI 교사가 질문을 읽는 중…";}
-   state.questionChecks=state.questions.map(q=>({q,kind:"loading",text:"지금 쓴 질문의 실제 내용과 면담 목적을 살펴보고 있어요…"}));
+   state.questionChecks=state.questions.map((q,i)=>({q,kind:"loading",expectedType:QUESTION_TYPE_LABELS[i],text:"질문의 실제 유형과 이 칸의 목표가 맞는지 먼저 살펴보고 있어요…"}));
    save();render();
-   const checks=await Promise.all(state.questions.map(q=>evaluateQuestionAI(q)));
+   const checks=await Promise.all(state.questions.map((q,i)=>evaluateQuestionAI(q,QUESTION_TYPE_LABELS[i])));
    state.questionChecks=checks.map((r,i)=>({q:state.questions[i],...r}));
    save();render();
  });
