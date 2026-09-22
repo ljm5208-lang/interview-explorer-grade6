@@ -428,27 +428,53 @@ function evaluateQuestion(q){
  const lower=s.toLowerCase();
  const purpose=state.prepare.purpose || "선택한 면담 목적";
  const target=state.prepare.target || "면담 대상자";
- const personal=["결혼","연애","월급","재산","주소","전화번호","가족관계","나이 몇","외모","집 어디","정치"];
- if(personal.some(k=>lower.includes(k))) return {kind:"sensitive",text:"상대방이 개인적인 정보를 말하기 불편할 수도 있어요. 면담 목적과 관련이 있는지, 상대가 편안하게 답할 수 있는지 먼저 생각해 볼까요?"};
- const off=["좋아하는 색","혈액형","게임 뭐","아이돌","누구 좋아","취미가 뭐"];
- if(off.some(k=>lower.includes(k)) && !/직업|일|면담|목적/.test(lower)) return {kind:"off",text:`이 질문이 '${purpose}'을/를 알아보는 데 도움이 되는지 생각해 보세요. 우리가 정말 알고 싶은 내용과 연결되는 질문일까요?`};
+ const personal=["주민등록","비밀번호","전화번호","주소","계좌","집 어디"];
+ if(personal.some(k=>lower.includes(k))) return {kind:"sensitive",text:"개인정보를 묻는 질문은 피하는 것이 좋아요. 면담 목적과 꼭 필요한 관련이 있는지 먼저 생각해 보세요."};
  const fact=/어떤|무엇|무슨|몇|언제|어디|어떻게|과정|하는 일|업무|방법|준비/.test(lower);
- const feel=/생각|느끼|보람|힘들|어떤 마음|중요하|까닭|이유/.test(lower);
+ const feel=/생각|느끼|보람|힘들|마음|중요하|까닭|이유/.test(lower);
  const future=/앞으로|계획|목표|꿈|하고 싶|해 주고 싶은|당부/.test(lower);
- let type=fact?"구체적인 사실에 대한 질문":feel?"생각이나 느낌에 대한 질문":future?"앞으로의 계획이나 당부에 대한 질문":"질문의 유형을 조금 더 생각해 볼 수 있어요.";
- const polite=/요\?|나요\?|까요\?|주세요|주실|하나요|하셨나요|있나요|인가요|습니까|세요/.test(s);
- const clear=s.length<=70 && /[?？]/.test(s);
- if(!polite) return {kind:"revise",text:"질문의 내용은 보이지만, 면담 대상자가 편안하게 답할 수 있도록 공손한 표현으로 다듬어 볼까요? 직접 더 좋은 표현을 만들어 보세요."};
- if(!clear) return {kind:"revise",text:"한 번에 알고 싶은 내용을 조금 더 분명하게 드러내면 좋아요. 대상자가 무엇을 답해야 하는지 생각해 보며 다시 써 보세요."};
- return {kind:"good",text:`좋은 질문이에요. ${type}에 해당하고, 면담 목적과 연결되는 내용을 물어보려는 의도가 보여요. 실제 면담에서는 답변을 잘 듣고 더 궁금한 점이 생기면 후속 질문으로 이어 갈 수 있어요.`};
+ let type=fact?"구체적인 사실에 대한 질문":feel?"생각이나 느낌에 대한 질문":future?"앞으로의 계획이나 당부에 대한 질문":"질문의 유형을 더 생각해 볼 수 있어요.";
+ const polite=/(요|나요|까요|주세요|주실|하나요|하셨나요|있나요|인가요|습니까|세요)/.test(s);
+ const clear=s.length<=100 && /[?？]/.test(s);
+ if(!polite) return {kind:"revise",text:"내용은 보이지만, 면담 대상자가 편안하게 답할 수 있도록 공손한 표현으로 다듬어 보세요."};
+ if(!clear) return {kind:"revise",text:"무엇을 알고 싶은지 조금 더 분명하게 드러내 보세요."};
+ return {kind:"good",text:"질문의 형식은 잘 갖추었어요. 이제 답변을 들은 뒤 더 궁금한 점을 후속 질문으로 이어 가 보세요."};
 }
 
-function makeQuestions(){
- const checks=state.questionChecks;
- return `<div class="card"><h2>질문을 직접 만들어 봐요</h2>
- <div class="callout">좋은 질문을 만들 때는 <b>면담 목적에 맞는가?</b> · <b>대상자에게 예의를 갖추었는가?</b> · <b>이해할 수 있는 명료한 표현인가?</b>를 살펴봐요. 불편하거나 민감한 질문도 없는지 확인해요.</div>
- <div class="form-grid" style="margin-top:18px">
- ${["구체적인 사실에 대한 질문","생각이나 느낌에 대한 질문","앞으로의 계획이나 당부에 대한 질문"].map((lab,i)=>`<div><label>${lab}</label><textarea class="q-input" data-qidx="${i}" placeholder="내가 궁금한 것을 직접 질문으로 만들어 보세요.">${esc(state.questions[i])}</textarea></div>`).join("")}
+async function evaluateQuestionAI(q){
+ const fallback=evaluateQuestion(q);
+ if(fallback.kind==="empty" || !q.trim()) return fallback;
+ const purpose=state.prepare.purpose || "아직 정하지 않은 면담 목적";
+ const target=state.prepare.target || "면담 대상자";
+ const systemPrompt=`너는 초등학교 6학년 국어 수업에서 '좋은 면담 질문'을 코칭하는 AI 교사다.
+학생이 쓴 질문을 실제로 읽고, 매번 질문 내용에 맞는 구체적인 피드백을 만들어야 한다.
+절대로 정해진 칭찬 문장을 반복하지 마라.
+평가 기준: 면담 목적과 관련되는가, 대상자에게 적절한가, 무엇을 알고 싶은지 분명한가, 답하기 쉬운가, 예의와 개인정보를 지키는가, 구체적인 답을 이끌 수 있는가, 사실/생각·느낌/앞으로의 계획·당부 중 무엇인지.
+면담 목적: ${purpose}
+면담 대상자: ${target}
+반드시 JSON 하나만 출력한다. 마크다운이나 코드블록을 사용하지 않는다.
+형식: {"kind":"good|revise|sensitive|off","type":"사실|생각이나 느낌|앞으로의 계획이나 당부|복합","text":"학생에게 보여 줄 2~4문장의 구체적인 피드백","strengths":["잘한 점"],"issues":["고칠 점"],"suggestion":"더 좋은 질문 예시. 좋으면 빈 문자열"}
+좋은 질문도 억지로 고치지 말고 질문의 실제 단어와 의도를 언급하라.`;
+ try{
+   const res=await fetch("https://interview-ai.jml5208.workers.dev/",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:q,history:[],systemPrompt})});
+   if(!res.ok)throw new Error("AI proxy error");
+   const data=await res.json(), raw=data.answer||data.message||data.content||"";
+   let parsed=null;
+   try{parsed=JSON.parse(raw)}catch(_){const x=raw.indexOf("{"),y=raw.lastIndexOf("}");if(x>=0&&y>x)try{parsed=JSON.parse(raw.slice(x,y+1))}catch(__){}}
+   if(!parsed||!parsed.text)throw new Error("invalid AI JSON");
+   return {kind:["good","revise","sensitive","off"].includes(parsed.kind)?parsed.kind:"revise",text:parsed.text,type:parsed.type||"",strengths:Array.isArray(parsed.strengths)?parsed.strengths:[],issues:Array.isArray(parsed.issues)?parsed.issues:[],suggestion:parsed.suggestion||""};
+ }catch(err){return {...fallback,text:"AI 피드백을 연결하지 못해 기본 점검을 보여 줍니다. 잠시 후 다시 시도해 보세요.\n\n"function bindMake(){
+ document.querySelectorAll(".q-input").forEach(el=>el.addEventListener("input",e=>{state.questions[Number(e.target.dataset.qidx)]=e.target.value;save()}));
+ document.getElementById("checkQuestions")?.addEventListener("click",async()=>{
+   const btn=document.getElementById("checkQuestions");
+   if(btn){btn.disabled=true;btn.textContent="AI가 질문을 살펴보는 중…";}
+   state.questionChecks=state.questions.map(q=>({q,kind:"loading",text:"질문의 목적·대상·표현을 살펴보고 있어요…"}));save();render();
+   const checks=await Promise.all(state.questions.map(q=>evaluateQuestionAI(q)));
+   state.questionChecks=checks.map((r,i)=>({q:state.questions[i],...r}));save();render();
+ });
+}
+
+대한 질문","생각이나 느낌에 대한 질문","앞으로의 계획이나 당부에 대한 질문"].map((lab,i)=>`<div><label>${lab}</label><textarea class="q-input" data-qidx="${i}" placeholder="내가 궁금한 것을 직접 질문으로 만들어 보세요.">${esc(state.questions[i])}</textarea></div>`).join("")}
  </div>
  <div class="actions"><button class="btn btn-primary" id="checkQuestions">세 질문 점검하기</button></div>
  ${checks?`<div class="section grid grid-3">${checks.map((r,i)=>`<div class="question-card"><strong>${i+1}. ${r.q||"(빈 질문)"}</strong><div class="feedback ${r.kind==="good"?"good":r.kind==="sensitive"||r.kind==="off"?"bad":"hint"}">${r.text}</div></div>`).join("")}</div>`:""}
