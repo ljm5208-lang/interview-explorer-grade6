@@ -20,7 +20,6 @@ jobs:
         run: |
           python3 <<'PY'
           from pathlib import Path
-          import re
 
           p = Path("index.html")
           s = p.read_text(encoding="utf-8")
@@ -37,7 +36,7 @@ jobs:
  const feel=/생각|느끼|보람|힘들|마음|중요하|까닭|이유/.test(lower);
  const future=/앞으로|계획|목표|꿈|하고 싶|해 주고 싶은|당부/.test(lower);
  let type=fact?"구체적인 사실에 대한 질문":feel?"생각이나 느낌에 대한 질문":future?"앞으로의 계획이나 당부에 대한 질문":"질문의 유형을 더 생각해 볼 수 있어요.";
- const polite=/요?|나요?|까요?|주세요|주실|하나요|하셨나요|있나요|인가요|습니까|세요/.test(s);
+ const polite=/(요|나요|까요|주세요|주실|하나요|하셨나요|있나요|인가요|습니까|세요)/.test(s);
  const clear=s.length<=100 && /[?？]/.test(s);
  if(!polite) return {kind:"revise",text:"내용은 보이지만, 면담 대상자가 편안하게 답할 수 있도록 공손한 표현으로 다듬어 보세요."};
  if(!clear) return {kind:"revise",text:"무엇을 알고 싶은지 조금 더 분명하게 드러내 보세요."};
@@ -76,19 +75,15 @@ async function evaluateQuestionAI(q){
    const res=await fetch("https://interview-ai.jml5208.workers.dev/",{
      method:"POST",
      headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({
-       message:q,
-       history:[],
-       systemPrompt
-     })
+     body:JSON.stringify({message:q,history:[],systemPrompt})
    });
    if(!res.ok)throw new Error("AI proxy error");
    const data=await res.json();
    const raw=data.answer||data.message||data.content||"";
    let parsed=null;
-   try{ parsed=JSON.parse(raw); }catch(_){
-     const m=raw.match(/{[sS]*}/);
-     if(m) try{parsed=JSON.parse(m[0])}catch(__){}
+   try{parsed=JSON.parse(raw)}catch(_){
+     const start=raw.indexOf("{"), end=raw.lastIndexOf("}");
+     if(start>=0 && end>start) try{parsed=JSON.parse(raw.slice(start,end+1))}catch(__){}
    }
    if(!parsed || !parsed.text)throw new Error("invalid AI JSON");
    return {
@@ -100,18 +95,14 @@ async function evaluateQuestionAI(q){
      suggestion:parsed.suggestion||""
    };
  }catch(err){
-   return {...fallback, text:"AI 피드백을 연결하지 못해 기본 점검을 보여 줍니다. 잠시 후 다시 시도해 보세요.\n\n"+fallback.text, aiError:true};
+   return {...fallback,text:"AI 피드백을 연결하지 못해 기본 점검을 보여 줍니다. 잠시 후 다시 시도해 보세요.\n\n"+fallback.text,aiError:true};
  }
 }
 
 '''
-          pattern = r'function evaluateQuestion(q){[sS]*?
-}
-
-function makeQuestions()'
-          s2, n = re.subn(pattern, new_eval + 'function makeQuestions()', s, count=1)
-          if n != 1:
-              raise SystemExit("evaluateQuestion block not found")
+          start = s.index("function evaluateQuestion(q){")
+          end = s.index("function makeQuestions()", start)
+          s = s[:start] + new_eval + s[end:]
 
           new_bind = r'''function bindMake(){
  document.querySelectorAll(".q-input").forEach(el=>el.addEventListener("input",e=>{
@@ -130,15 +121,11 @@ function makeQuestions()'
 }
 
 '''
-          pattern2 = r'function bindMake(){[sS]*?
-}
+          start = s.index("function bindMake(){")
+          end = s.index("function prepare()", start)
+          s = s[:start] + new_bind + s[end:]
 
-function prepare()'
-          s3, n2 = re.subn(pattern2, new_bind + 'function prepare()', s2, count=1)
-          if n2 != 1:
-              raise SystemExit("bindMake block not found")
-
-          p.write_text(s3, encoding="utf-8")
+          p.write_text(s, encoding="utf-8")
           print("index.html upgraded")
           PY
 
